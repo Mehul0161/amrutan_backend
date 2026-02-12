@@ -1,0 +1,9 @@
+graph TD
+    User((User)) -->|HTTPS| ALB[Load Balancer]
+    ALB -->|REST/GraphQL| API[API Gateway / Service]
+    API -->|Read/Write| DB[(PostgreSQL)]
+    API -->|Cache/PubSub| Redis[(Redis)]
+    API -->|Queue| BullMQ[BullMQ]
+    BullMQ -->|Process| Worker[Background Worker]
+    Worker -->|Audit| AuditLogs[Audit Trail]
+    Worker -->|Notify| Mail[Email/SMS Service]

@@ -1,0 +1,40 @@
+erDiagram
+    USERS ||--o{ DOCTORS : "is_a"
+    USERS ||--o{ PATIENTS : "is_a"
+    DOCTORS ||--o{ AVAILABILITY_SLOTS : "defines"
+    PATIENTS ||--o{ CONSULTATIONS : "books"
+    DOCTORS ||--o{ CONSULTATIONS : "attends"
+    CONSULTATIONS ||--o{ PRESCRIPTIONS : "generates"
+    CONSULTATIONS ||--|| PAYMENTS : "processed_by"
+    USERS ||--o{ AUDIT_LOGS : "triggers"
+
+    USERS {
+        uuid id PK
+        string email
+        string password_hash
+        string role "ADMIN | DOCTOR | PATIENT"
+        boolean mfa_enabled
+        string name
+    }
+    AVAILABILITY_SLOTS {
+        uuid id PK
+        uuid doctor_id FK
+        datetime start_time
+        datetime end_time
+        string status "AVAILABLE | BOOKED"
+    }
+    CONSULTATIONS {
+        uuid id PK
+        uuid patient_id FK
+        uuid doctor_id FK
+        uuid slot_id FK
+        string status "PENDING | ACTIVE | COMPLETED | CANCELLED"
+        string meeting_link
+    }
+    AUDIT_LOGS {
+        uuid id PK
+        uuid user_id FK
+        string action
+        string resource
+        datetime timestamp
+    }

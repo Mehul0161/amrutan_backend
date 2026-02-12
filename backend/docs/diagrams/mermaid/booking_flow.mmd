@@ -1,0 +1,17 @@
+sequenceDiagram
+    participant P as Patient
+    participant B as Booking Service
+    participant R as Redis (Lock)
+    participant D as DB (Postgres)
+    participant N as Notification Service
+
+    P->>B: Request Appointment(doctorId, slotId)
+    B->>R: Acquire Distributed Lock (doctor_slot_id)
+    R-->>B: Lock Acquired
+    B->>D: Check availability & Patient constraints
+    D-->>B: Available
+    B->>D: Create Consultation (status: PENDING)
+    B->>D: Update Slot (status: BOOKED)
+    B->>R: Release Lock
+    B->>P: Appointment Confirmed
+    B->>N: Schedule Reminder
