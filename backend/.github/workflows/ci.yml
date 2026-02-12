@@ -1,0 +1,58 @@
+name: Backend CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:latest
+        env:
+          POSTGRES_USER: amrutam_user
+          POSTGRES_PASSWORD: Amrutam123
+          POSTGRES_DB: amrutam
+        ports:
+          - 5432:5432
+      redis:
+        image: redis:latest
+        ports:
+          - 6379:6379
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Use Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: backend/package.json
+        
+    - name: Install dependencies
+      run: npm install
+      working-directory: backend
+      
+    - name: Generate Prisma Client
+      run: npx prisma generate
+      working-directory: backend
+      env:
+        DATABASE_URL: postgresql://amrutam_user:Amrutam123@localhost:5432/amrutam
+        
+    - name: Run Lint
+      run: npm run build
+      working-directory: backend
+      
+    - name: Run Tests
+      run: npm test
+      working-directory: backend
+      env:
+        DATABASE_URL: postgresql://amrutam_user:Amrutam123@localhost:5432/amrutam
+        REDIS_URL: redis://localhost:6379
+        JWT_SECRET: test_secret
+        ENCRYPTION_KEY: your-32-character-encryption-key
