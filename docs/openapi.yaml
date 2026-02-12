@@ -1,0 +1,297 @@
+openapi: 3.0.3
+info:
+  title: Amrutam Telemedicine API
+  description: |
+    Production-grade API for Amrutam's Telemedicine system.
+    Focuses on scalability (100k daily consultations), security (RBAC, PHI encryption), and observability.
+  version: 1.0.0
+servers:
+  - url: http://localhost:3000/api/v1
+    description: Local development server
+
+tags:
+  - name: Auth
+    description: User lifecycle and authentication
+  - name: Doctors
+    description: Doctor profiles and availability
+  - name: Consultations
+    description: Booking and consultation lifecycle
+  - name: Admin
+    description: Analytics and audit trails
+
+paths:
+  /auth/register:
+    post:
+      summary: Register a new user
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRegistration'
+      responses:
+        201:
+          description: User created
+        400:
+          description: Invalid input
+
+  /auth/login:
+    post:
+      summary: Authenticate and get tokens
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string }
+      responses:
+        200:
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accessToken: { type: string }
+                  refreshToken: { type: string }
+                  mfaRequired: { type: boolean }
+
+  /doctors:
+    get:
+      summary: Search and filter doctors
+      tags: [Doctors]
+      parameters:
+        - name: specialty
+          in: query
+          schema: { type: string }
+        - name: query
+          in: query
+          description: Search by name or location
+          schema: { type: string }
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+      responses:
+        200:
+          description: List of doctors
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DoctorProfile'
+
+  /doctors/{doctorId}/availability:
+    get:
+      summary: Get doctor's availability slots
+      tags: [Doctors]
+      parameters:
+        - name: doctorId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: start_date
+          in: query
+          schema: { type: string, format: date }
+      responses:
+        200:
+          description: Available slots
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AvailabilitySlot'
+    post:
+      summary: Manage availability (Doctor Only)
+      tags: [Doctors]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                slots:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      start_time: { type: string, format: date-time }
+                      end_time: { type: string, format: date-time }
+      responses:
+        200: { description: Slots updated }
+
+  /consultations:
+    post:
+      summary: Book a consultation
+      tags: [Consultations]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [doctorId, slotId]
+              properties:
+                doctorId: { type: string, format: uuid }
+                slotId: { type: string, format: uuid }
+      responses:
+        201:
+          description: Booking successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Consultation'
+
+  /consultations/{id}:
+    get:
+      summary: Get consultation details
+      tags: [Consultations]
+      security: [{ bearerAuth: [] }]
+      responses:
+        200:
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Consultation'
+    patch:
+      summary: Update consultation status
+      tags: [Consultations]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status: { type: string, enum: [ACTIVE, COMPLETED, CANCELLED] }
+      responses:
+        200: { description: Status updated }
+
+  /consultations/{id}/prescriptions:
+    post:
+      summary: Add prescription (Doctor Only)
+      tags: [Consultations]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/PrescriptionItem'
+      responses:
+        201: { description: Prescription added }
+
+  /admin/analytics:
+    get:
+      summary: System-wide analytics
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      responses:
+        200:
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  totalConsultations: { type: integer }
+                  activeDoctors: { type: integer }
+                  revenue: { type: number }
+
+  /admin/audit-logs:
+    get:
+      summary: Compliance audit trails
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: resource_id
+          in: query
+          schema: { type: string }
+      responses:
+        200:
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AuditLog'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    UserRegistration:
+      type: object
+      required: [email, password, role]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, minLength: 8 }
+        role: { type: string, enum: [ADMIN, DOCTOR, PATIENT] }
+        name: { type: string }
+
+    DoctorProfile:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        specialty: { type: string }
+        bio: { type: string }
+        rating: { type: number }
+
+    AvailabilitySlot:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        start_time: { type: string, format: date-time }
+        end_time: { type: string, format: date-time }
+        status: { type: string, enum: [AVAILABLE, BOOKED] }
+
+    Consultation:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        patientId: { type: string, format: uuid }
+        doctorId: { type: string, format: uuid }
+        slotId: { type: string, format: uuid }
+        status: { type: string, enum: [PENDING, ACTIVE, COMPLETED, CANCELLED] }
+        meetingLink: { type: string }
+        createdAt: { type: string, format: date-time }
+
+    PrescriptionItem:
+      type: object
+      required: [medicine, dosage]
+      properties:
+        medicine: { type: string }
+        dosage: { type: string }
+        frequency: { type: string }
+        duration: { type: string }
+
+    AuditLog:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        userId: { type: string, format: uuid }
+        action: { type: string }
+        resource: { type: string }
+        timestamp: { type: string, format: date-time }
+        ipAddress: { type: string }

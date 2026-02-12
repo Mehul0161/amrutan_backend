@@ -1,0 +1,38 @@
+services:
+  postgres:
+    image: postgres:latest
+    container_name: amrutam-db
+    environment:
+      POSTGRES_USER: amrutam_user
+      POSTGRES_PASSWORD: Amrutam123
+      POSTGRES_DB: amrutam
+    ports:
+      - "5444:5432"
+    volumes:
+      - amrutam_db_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:latest
+    container_name: amrutam-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - amrutam_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  amrutam_db_data:
+  amrutam_redis_data:
+
+# docker-compose up -d      this is to start the containers in detached mode
+# docker-compose down       this is to stop the containers
+
